@@ -1,0 +1,7 @@
+{
+  "-1": "System is busy",
+  "0": "ok",
+  "500": "fail",
+  "400": "Request parameter error",
+  "1000": "Hello,%s!Your account is:%s"
+}
