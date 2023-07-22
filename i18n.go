@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -80,7 +80,7 @@ func New(opts ...Option) (*Manager, error) {
 		f(opt)
 	}
 
-	langFileList, err := ioutil.ReadDir(opt.langDir)
+	langFileList, err := os.ReadDir(opt.langDir)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func New(opts ...Option) (*Manager, error) {
 			return nil, err
 		}
 
-		byteValue, _ := ioutil.ReadAll(langFile)
+		byteValue, _ := io.ReadAll(langFile)
 		err = json.Unmarshal(byteValue, &langConfig)
 		if err != nil {
 			return nil, err
