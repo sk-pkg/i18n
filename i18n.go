@@ -35,10 +35,10 @@ type Manager struct {
 
 // result 输出结果
 type result struct {
-	Status int         `json:"status"`
-	Desc   string      `json:"desc"`
-	Trace  string      `json:"trace"`
-	Data   interface{} `json:"data"`
+	Code  int         `json:"code"`
+	Msg   string      `json:"msg"`
+	Trace string      `json:"trace"`
+	Data  interface{} `json:"data"`
 }
 
 type Data struct {
@@ -141,11 +141,11 @@ func (m *Manager) lang(c *gin.Context) string {
 }
 
 // result 返回要输出的结果
-func (m *Manager) result(c *gin.Context, status int, data interface{}, err error) result {
+func (m *Manager) result(c *gin.Context, code int, data interface{}, err error) result {
 	var res result
 	var tmplPrams []string
 
-	res.Status = status
+	res.Code = code
 
 	switch data.(type) {
 	case Data:
@@ -156,7 +156,7 @@ func (m *Manager) result(c *gin.Context, status int, data interface{}, err error
 		res.Data = data
 	}
 
-	res.Desc = m.Trans(m.lang(c), strconv.Itoa(status), tmplPrams...)
+	res.Msg = m.Trans(m.lang(c), strconv.Itoa(code), tmplPrams...)
 
 	if m.isDebugMode(c) && err != nil {
 		res.Trace = fmt.Sprintf("%v", err)
@@ -244,37 +244,37 @@ func (m *Manager) LangExist(lang string) bool {
 
 // JSON serializes the given struct as JSON into the response body.
 // It also sets the Content-Type as "application/json".
-func (m *Manager) JSON(c *gin.Context, status int, data interface{}, err error) {
-	c.Set("response_status", status)  //设置响应信息的statusCode
-	c.JSON(http.StatusOK, m.result(c, status, data, err))
+func (m *Manager) JSON(c *gin.Context, code int, data interface{}, err error) {
+	c.Set("response_code", code) // 设置响应信息的codeCode
+	c.JSON(http.StatusOK, m.result(c, code, data, err))
 }
 
 // JSONP serializes the given struct as JSON into the response body.
 // It add padding to response body to request data from a server residing in a different domain than the client.
 // It also sets the Content-Type as "application/javascript".
-func (m *Manager) JSONP(c *gin.Context, status int, data interface{}, err error) {
-	c.JSONP(http.StatusOK, m.result(c, status, data, err))
+func (m *Manager) JSONP(c *gin.Context, code int, data interface{}, err error) {
+	c.JSONP(http.StatusOK, m.result(c, code, data, err))
 }
 
 // AsciiJSON serializes the given struct as JSON into the response body with unicode to ASCII string.
 // It also sets the Content-Type as "application/json".
-func (m *Manager) AsciiJSON(c *gin.Context, status int, data interface{}, err error) {
-	c.AsciiJSON(http.StatusOK, m.result(c, status, data, err))
+func (m *Manager) AsciiJSON(c *gin.Context, code int, data interface{}, err error) {
+	c.AsciiJSON(http.StatusOK, m.result(c, code, data, err))
 }
 
 // PureJSON serializes the given struct as JSON into the response body.
 // PureJSON, unlike JSON, does not replace special html characters with their unicode entities.
-func (m *Manager) PureJSON(c *gin.Context, status int, data interface{}, err error) {
-	c.PureJSON(http.StatusOK, m.result(c, status, data, err))
+func (m *Manager) PureJSON(c *gin.Context, code int, data interface{}, err error) {
+	c.PureJSON(http.StatusOK, m.result(c, code, data, err))
 }
 
 // XML serializes the given struct as XML into the response body.
 // It also sets the Content-Type as "application/xml".
-func (m *Manager) XML(c *gin.Context, status int, data interface{}, err error) {
-	c.XML(http.StatusOK, m.result(c, status, data, err))
+func (m *Manager) XML(c *gin.Context, code int, data interface{}, err error) {
+	c.XML(http.StatusOK, m.result(c, code, data, err))
 }
 
 // YAML serializes the given struct as YAML into the response body.
-func (m *Manager) YAML(c *gin.Context, status int, data interface{}, err error) {
-	c.YAML(http.StatusOK, m.result(c, status, data, err))
+func (m *Manager) YAML(c *gin.Context, code int, data interface{}, err error) {
+	c.YAML(http.StatusOK, m.result(c, code, data, err))
 }

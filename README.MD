@@ -83,8 +83,8 @@ func httpServer() *gin.Engine {
 Json返回如下
 ```json
 {
-    "status": 0,
-    "desc": "ok",
+    "code": 0,
+    "msg": "ok",
     "trace": "",
     "data": "success"
 }

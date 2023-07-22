@@ -18,11 +18,11 @@ func TestI18n(t *testing.T) {
 
 	host := "http://127.0.0.1:8080"
 	apis := []result{
-		{Status: -1, Desc: "系统繁忙", Data: "busy", Trace: "busy... "},
-		{Status: 0, Desc: "ok", Data: "ok", Trace: ""},
-		{Status: 500, Desc: "fail", Data: "fail", Trace: ""},
-		{Status: 400, Desc: "请求参数错误", Data: "params", Trace: ""},
-		{Status: 1000, Desc: "你好,Seakee!你的账号是:18888888888", Data: "test", Trace: ""},
+		{Code: -1, Msg: "系统繁忙", Data: "busy", Trace: "busy... "},
+		{Code: 0, Msg: "ok", Data: "ok", Trace: ""},
+		{Code: 500, Msg: "fail", Data: "fail", Trace: ""},
+		{Code: 400, Msg: "请求参数错误", Data: "params", Trace: ""},
+		{Code: 1000, Msg: "你好,Seakee!你的账号是:18888888888", Data: "test", Trace: ""},
 	}
 
 	for _, api := range apis {
@@ -47,7 +47,7 @@ func setupRouter() *gin.Engine {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	msg.SetLang("zh-CN")
 	r.GET("/busy", func(c *gin.Context) {
 		msg.JSON(c, -1, "busy", errors.New("busy... "))
 	})
