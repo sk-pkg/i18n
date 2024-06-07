@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -18,33 +18,40 @@ const (
 	defaultEnvKey   = "RUN_MODE"
 )
 
-type Option func(*option)
+type (
+	Option func(*option)
 
-type option struct {
-	langDir     string
-	defaultLang string
-	envKey      string
-	debugMode   bool
-}
+	option struct {
+		langDir     string
+		defaultLang string
+		envKey      string
+		debugMode   bool
+	}
 
-type Manager struct {
-	LangList map[string]map[string]string
-	Option   *option
-	RunEnv   string
-}
+	Manager struct {
+		LangList map[string]map[string]string
+		Option   *option
+		RunEnv   string
+	}
 
-// result 输出结果
-type result struct {
-	Code  int         `json:"code"`
-	Msg   string      `json:"msg"`
-	Trace string      `json:"trace"`
-	Data  interface{} `json:"data"`
-}
+	// result 输出结果
+	result struct {
+		Code  int         `json:"code"`
+		Msg   string      `json:"msg"`
+		Trace trace       `json:"trace"`
+		Data  interface{} `json:"data"`
+	}
 
-type Data struct {
-	Params []string
-	Data   interface{}
-}
+	trace struct {
+		ID   string `json:"id"`
+		Desc string `json:"desc"`
+	}
+
+	Data struct {
+		Params []string
+		Data   interface{}
+	}
+)
 
 func WithLangDir(dir string) Option {
 	return func(o *option) {
@@ -63,12 +70,14 @@ func WithEnvKey(key string) Option {
 		o.envKey = key
 	}
 }
+
 func WithDebugMode(mode bool) Option {
 	return func(o *option) {
 		o.debugMode = mode
 	}
 }
 
+// New 起到的作用是初始化Manager实例，已经尽可能精简了。
 func New(opts ...Option) (*Manager, error) {
 	opt := &option{
 		langDir:     defaultLangPath,
@@ -80,33 +89,13 @@ func New(opts ...Option) (*Manager, error) {
 		f(opt)
 	}
 
-	langFileList, err := os.ReadDir(opt.langDir)
+	langList, err := loadLangFiles(opt.langDir)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(langFileList) < 1 {
-		return nil, errors.New("Initialize i18n config failed, Can't found lang config file! ")
-	}
-
-	langList := make(map[string]map[string]string)
-	for i := range langFileList {
-		langConfig := make(map[string]string)
-		lang := strings.Split(langFileList[i].Name(), ".")[0]
-		filePath := opt.langDir + "/" + langFileList[i].Name()
-		langFile, err := os.Open(filePath)
-		if err != nil {
-			return nil, err
-		}
-
-		byteValue, _ := io.ReadAll(langFile)
-		err = json.Unmarshal(byteValue, &langConfig)
-		if err != nil {
-			return nil, err
-		}
-
-		langList[lang] = langConfig
-		_ = langFile.Close()
+	if len(langList) == 0 {
+		return nil, errors.New("没有找到语言配置文件")
 	}
 
 	runEnv := os.Getenv(opt.envKey)
@@ -114,30 +103,50 @@ func New(opts ...Option) (*Manager, error) {
 	return &Manager{LangList: langList, Option: opt, RunEnv: runEnv}, nil
 }
 
+// loadLangFiles是提取出的读取和解析语言文件的函数。
+func loadLangFiles(langDir string) (map[string]map[string]string, error) {
+	langList := make(map[string]map[string]string)
+
+	err := filepath.Walk(langDir, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() {
+			lang := strings.TrimSuffix(info.Name(), filepath.Ext(info.Name()))
+			langConfig := make(map[string]string)
+
+			var byteValue []byte
+			byteValue, err = os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+
+			if err = json.Unmarshal(byteValue, &langConfig); err != nil {
+				return err
+			}
+
+			langList[lang] = langConfig
+		}
+		return nil
+	})
+
+	return langList, err
+}
+
 // lang 返回语言
 func (m *Manager) lang(c *gin.Context) string {
-	lang := m.Option.defaultLang
-
 	// 优先从header直接获取语言信息
-	headerLang := c.GetHeader("lang")
+	headerLang := c.Request.Header.Get("lang")
 	if headerLang != "" {
 		return headerLang
 	}
 
 	ua := c.Request.UserAgent()
 	for _, param := range strings.Split(ua, ";") {
-		if !strings.Contains(param, "=") {
-			continue
-		}
-
 		paramList := strings.Split(param, "=")
-		switch paramList[0] {
-		case "lang", "Lang":
-			lang = paramList[1]
+		if len(paramList) == 2 && paramList[0] == "lang" {
+			return paramList[1]
 		}
 	}
 
-	return lang
+	return m.Option.defaultLang
 }
 
 // result 返回要输出的结果
@@ -158,8 +167,13 @@ func (m *Manager) result(c *gin.Context, code int, data interface{}, err error) 
 
 	res.Msg = m.Trans(m.lang(c), strconv.Itoa(code), tmplPrams...)
 
+	traceID, exists := c.Get("trace_id")
+	if exists {
+		res.Trace.ID = traceID.(string)
+	}
+
 	if m.isDebugMode(c) && err != nil {
-		res.Trace = fmt.Sprintf("%v", err)
+		res.Trace.Desc = fmt.Sprintf("%v", err)
 	}
 
 	return res
@@ -250,7 +264,7 @@ func (m *Manager) JSON(c *gin.Context, code int, data interface{}, err error) {
 }
 
 // JSONP serializes the given struct as JSON into the response body.
-// It add padding to response body to request data from a server residing in a different domain than the client.
+// It adds padding to response body to request data from a server residing in a different domain than the client.
 // It also sets the Content-Type as "application/javascript".
 func (m *Manager) JSONP(c *gin.Context, code int, data interface{}, err error) {
 	c.JSONP(http.StatusOK, m.result(c, code, data, err))
